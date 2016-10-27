@@ -1,0 +1,78 @@
+//
+//  PrefixHeader.pch
+//  4DAGE_360Player
+//
+//  Created by 4DAGE_HUA on 16/6/16.
+//  Copyright © 2016年 4DAGE. All rights reserved.
+//
+
+#ifndef PrefixHeader_pch
+#define PrefixHeader_pch
+#ifdef __OBJC__
+
+
+//#import "MacroDefine.h"
+//#import "NSString+Extension.h"
+//#import "NSObject+MJKeyValue.h"
+//#import "MJExtension.h"
+
+
+#import "UIImageView+WebCache.h"
+#import "UIView+Extension.h"
+#import "UIImage+Extension.h"
+#import "UIBarButtonItem_ZHExtension.h"
+#import "UIColor+ZHColor.h"
+#import "Masonry.h"
+#import "MBProgressHUD+MJ.h"
+#import "UITableView+tableViewType.h"
+#import "NSObject+Property.h"
+#import "NSObject+keyValue2object.h"
+
+#define ZHfileManager [NSFileManager defaultManager]
+#define coredataManager [ZHCoreDataManager sharedManager]
+
+#define theBundle [NSBundle mainBundle]
+#define VIDEOTABLECELL_NAME   @"Video"
+
+
+#define ONLINEPLIST @"http://show.4dage.com/testDownload.plist"
+
+
+
+//全局的绿色主题
+#define ZHColor(r, g, b) [UIColor colorWithRed:r/255.0f green:g/255.0f blue:b/255.0f alpha:1]
+#define ZHGolbalGreen ZHColor(33, 197, 180)
+
+//沙盒文档路径
+#define ZHdocumentPath [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,NSUserDomainMask,YES)lastObject]
+
+//沙盒缓存文件夹路径
+#define ZHcachePath [NSSearchPathForDirectoriesInDomains(NSCachesDirectory,NSUserDomainMask,YES)lastObject]
+
+
+//#define plistPath [[NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,NSUserDomainMask,YES)lastObject] stringByAppendingPathComponent:@"mp4File.plist"]
+
+
+//抽屉顶部距离 底部一样
+#define ZhScaleTopMargin 35
+//app的高度
+#define ZHAppWidth ([UIScreen mainScreen].bounds.size.width)
+//app的宽度
+#define ZHAppHeight ([UIScreen mainScreen].bounds.size.height)
+//抽屉拉出来右边剩余比例
+#define ZHZoomScaleRight 0.14
+
+//推荐cell的高度
+#define ZHRnmdCellHeight 210.0
+
+//背景的灰色
+#define ZHBackgroundGrayColor WNXColor(51, 52, 53)
+//判断系统版本号是否是iOS8以上
+#define iOS8 [[[UIDevice currentDevice] systemVersion] floatValue] >= 8.0
+
+#endif
+
+// Include any system framework and library headers here that should be included in all compilation units.
+// You will also need to set the Prefix Header build setting of one or more of your targets to reference this file.
+
+#endif /* PrefixHeader_pch */

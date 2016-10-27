@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<array>
+	<dict>
+		<key>downloadPath</key>
+		<string>http://7xl99o.com2.z0.glb.qiniucdn.com/plane.mp4</string>
+		<key>name</key>
+		<string>plane.mp4</string>
+		<key>imageUrlStr</key>
+		<string>http://7xl99o.com2.z0.glb.qiniucdn.com/testDownload.jpg</string>
+	</dict>
+	<dict>
+		<key>downloadPath</key>
+		<string>http://7xl99o.com2.z0.glb.qiniucdn.com/HELP.mp4</string>
+		<key>name</key>
+		<string>HELP.mp4</string>
+		<key>imageUrlStr</key>
+		<string>http://7xl99o.com2.z0.glb.qiniucdn.com/HELP.png</string>
+	</dict>
+	<dict>
+		<key>downloadPath</key>
+		<string>https://dn-4dage.qbox.me/YinLong_AR.apk</string>
+		<key>name</key>
+		<string>YinLong_AR.apk</string>
+		<key>imageUrlStr</key>
+		<string>http://7xl99o.com2.z0.glb.qiniucdn.com/testDownload.jpg</string>
+	</dict>
+	<dict>
+		<key>downloadPath</key>
+		<string>https://dn-4dage.qbox.me/bigScene.ipa</string>
+		<key>name</key>
+		<string>bigScene.ipa</string>
+		<key>imageUrlStr</key>
+		<string>http://7xl99o.com2.z0.glb.qiniucdn.com/testDownload.jpg</string>
+	</dict>
+</array>
+</plist>
