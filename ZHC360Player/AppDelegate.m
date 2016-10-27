@@ -7,6 +7,8 @@
 //
 
 #import "AppDelegate.h"
+#import "MainViewController.h"
+#import "DBManager.h"
 
 @interface AppDelegate ()
 
@@ -16,7 +18,32 @@
 
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
-    // Override point for customization after application launch.
+    
+    // 1.创建窗口
+    self.window = [[UIWindow alloc]init];
+    self.window.frame = [UIScreen mainScreen].bounds;
+    
+    //2.设置窗口的根控制器
+    MainViewController *MainVC = [[MainViewController alloc]init];
+    
+    self.window.rootViewController = MainVC;
+    
+    //3.显示窗口
+    [self.window makeKeyAndVisible];
+    [application setStatusBarStyle:UIStatusBarStyleLightContent];
+
+    
+    if(![[NSUserDefaults standardUserDefaults] boolForKey:@"firstStart"]){
+        
+        [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"firstStart"];
+        
+        NSLog(@"第一次启动");
+    }
+    
+    dispatch_async(dispatch_get_global_queue(0, 0), ^{
+        
+        [[DBManager shareTaskManager] createDatabase] ? NSLog(@"数据库存在") : NSLog(@"数据库不存在");
+    });
     return YES;
 }
 
