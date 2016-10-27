@@ -6,23 +6,23 @@
 //  Copyright © 2016年 ZHC. All rights reserved.
 //
 
-#import "ViewController.h"
+#import "DownloadViewController.h"
 #import "ZHDownloadTaskManager.h"
 #import "ZHDownload.h"
 #import "NSString+Hash.h"
-#import "DownloadCellModel.h"
+#import "PlayerVC.h"
 #import "DownloadModel.h"
+#import "VideoModel.h"
 #import "DownloadTableViewCell.h"
 #import "LocationTableViewCell.h"
+#import "DBManager.h"
 
 //app的高度
 #define AppWidth ([UIScreen mainScreen].bounds.size.width)
 //app的宽度
 #define AppHeight ([UIScreen mainScreen].bounds.size.height)
 
-NSUInteger a;
-
-@interface ViewController ()<UITableViewDataSource, UITableViewDelegate, DownloadTableViewCellChangeStateDelegate, LocationTableViewCellDetailDelagate>
+@interface DownloadViewController ()<UITableViewDataSource, UITableViewDelegate, DownloadTableViewCellChangeStateDelegate, LocationTableViewCellDetailDelagate>
 
 // 展现下载详情的tableView
 @property (strong, nonatomic) UITableView         *downlaodTableView;
@@ -44,9 +44,36 @@ NSUInteger a;
 
 // 是否存在本地section
 @property (assign, nonatomic) BOOL                isExistLocationSection;
+
 @end
 
-@implementation ViewController
+@implementation DownloadViewController
+
+#pragma mark - 单例
+static DownloadViewController *singletonViewController;
++ (instancetype)defaultViewController{
+    
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        
+        singletonViewController = [[DownloadViewController alloc] init];
+    });
+    return singletonViewController;
+}
+
++ (instancetype)allocWithZone:(struct _NSZone *)zone{
+    
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        singletonViewController = [super allocWithZone:zone];
+    });
+    return singletonViewController;
+}
+
+- (id)copyWithZone:(NSZone *)zone{
+    
+    return singletonViewController;
+}
 
 #pragma mark - 懒加载
 - (NSTimer *)currentTimer{
@@ -61,133 +88,124 @@ NSUInteger a;
 - (NSMutableArray *)sectionDataArray{
     
     if (!_sectionDataArray) {
+        
         _sectionDataArray = [NSMutableArray array];
     }
     return _sectionDataArray;
 }
-/*  ================这段代码是测试cell根据后台数据的变化，及时更新cell=================
- 
- NSString *temp = [self.dataArray objectAtIndex:0];
- NSLog(@"%@",temp);
- dispatch_async(dispatch_get_global_queue(0, 0), ^{
- 
- NSInteger inte = [temp integerValue];
- 
- for (int i = 0; i <= 520; i++) {
- inte ++;
- self.dataArray[0] = [NSString stringWithFormat:@"%ld",inte];
- 
- dispatch_sync(dispatch_get_main_queue(), ^{
- [self.downlaodTableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:0 inSection:0]] withRowAnimation:UITableViewRowAnimationNone];
- });
- }
- 
- });
- =====================主要是注意在主线程更新UI，动画效果选None========================
- */
 
-/* ================这段代码用于点击左上角按钮更新一次进度，弃用=================
- for(int i = 0; i < self.dataArray.count; i++){
- 
- DownloadModel *model = self.dataArray[i];
- if ([model.progressInfo isEqualToString:@"下载完成"] || [model.progressInfo isEqualToString:@"等待下载"]) { //下载完成
- dispatch_async(dispatch_get_main_queue(), ^{
- [_downlaodTableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:i inSection:0]] withRowAnimation:UITableViewRowAnimationNone];
- });
- continue;
- }
- 
- long long tempDataSize = [[ZHDownloadTaskManager shareTaskManager] getDownloadDataSizeWithName:model.name];
- model.tempDataSize = tempDataSize;
- dispatch_async(dispatch_get_main_queue(), ^{
- [_downlaodTableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:i inSection:0]] withRowAnimation:UITableViewRowAnimationNone];
- //[_downlaodTableView reloadSections:[NSIndexSet indexSetWithIndex:0] withRowAnimation:UITableViewRowAnimationNone];
- });
- }
- ==========================================================================
- */
+// 恢复持久化数据
+- (void)recoverDataFromSqlite{
+    
+    NSArray *arr = [[DBManager shareTaskManager] queryData];
+    if(!arr || arr.count == 0){
+        return;
+    }
+    
+    for (NSDictionary *dict in arr) {
+        
+        VideoModel *videoModel = [VideoModel cellModelWithDict:dict];
+        if(videoModel.isDownloading){ // 创建下载section，加入
+            
+            [self shouldCreateDownloadSection];
+            DownloadModel *downloadSectionModel = self.sectionDataArray.firstObject;
+            [downloadSectionModel.cellModelsArray addObject:videoModel];
+            
+        }else if(!videoModel.isDownloading){ // 创建本地section，加入
+            
+            [self shouldCreateLocationSection];
+            DownloadModel *locationSectionModel = self.sectionDataArray.lastObject;
+            [locationSectionModel.cellModelsArray addObject:videoModel];
+        }
+    }
+    
+}
 
 #pragma mark - UI初始化
 - (void)viewDidLoad {
     
     [super viewDidLoad];
     
+    [self recoverDataFromSqlite];
+    
     self.automaticallyAdjustsScrollViewInsets = YES;
     self.navigationController.navigationBar.translucent = NO;
     self.edgesForExtendedLayout = UIRectEdgeNone;
     
     //设置右上角添加任务
-    UIBarButtonItem *rightButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAdd target:self action:@selector(rightItemAction)];
+    UIBarButtonItem *rightButton = [[UIBarButtonItem alloc] initWithTitle:@"多选" style:UIBarButtonItemStylePlain target:self action:@selector(rightItemAction)];
     self.navigationItem.rightBarButtonItem = rightButton;
-    
-    //[self.navigationController.navigationItem setRightBarButtonItem:rightButton];
-//    UIBarButtonItem *leftButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemRefresh target:self action:@selector(leftItemAction)];
-//    self.navigationItem.leftBarButtonItem = leftButton;
     
     //设置表格
     [self.view addSubview:({
         self.downlaodTableView = [[UITableView alloc]initWithFrame:CGRectMake(0, 0, AppWidth,AppHeight - 6) style:UITableViewStylePlain];
         self.downlaodTableView.delegate = self;
         self.downlaodTableView.dataSource = self;
-        self.downlaodTableView.backgroundColor = [UIColor lightGrayColor];
+        self.downlaodTableView.backgroundColor = ZHColor(239, 239, 244);
         self.downlaodTableView.separatorStyle = UITableViewCellSeparatorStyleNone;
         self.downlaodTableView;
     })];
 }
 
-
 // 添加下载任务
 - (void)rightItemAction{
     
-    DownloadCellModel *model1 = [[DownloadCellModel alloc]init];
-    model1.name = @"plane.mp4";
-    model1.downloadPath = @"http://7xl99o.com2.z0.glb.qiniucdn.com/plane.mp4";
+    NSLog(@"多选？");
+}
 
-    DownloadCellModel *model2 = [[DownloadCellModel alloc]init];
-    model2.name = @"YinLong_AR.apk";
-    model2.downloadPath = @"https://dn-4dage.qbox.me/YinLong_AR.apk";
+#pragma mark - 增加section代码
+- (void)shouldCreateDownloadSection{
     
-    DownloadCellModel *model3 = [[DownloadCellModel alloc]init];
-    model3.name = @"bigScene.ipa";
-    model3.downloadPath = @"https://dn-4dage.qbox.me/bigScene.ipa";
-    
-    if (a == 0) {
-        [self addTaskWithModel:model1];
-        a++;
-    }else if(a == 1){
-        [self addTaskWithModel:model2];
-        a++;
-    }else{
-        [self addTaskWithModel:model3];
+    if (_isExistDownloadSection) {
+        return;
     }
+    
+    DownloadModel *sectionModel = [[DownloadModel alloc] init];
+    sectionModel.sectionType = DownloadSectionTypeDownload;
+    _isExistDownloadSection = YES;
+    [self.sectionDataArray insertObject:sectionModel atIndex:0];
+    [self.downlaodTableView insertSections:[NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0, 1)] withRowAnimation:UITableViewRowAnimationNone];
+    
+}
+
+- (void)shouldCreateLocationSection{
+    
+    if (_isExistLocationSection) {
+        return;
+    }
+    //创建本地section
+    DownloadModel *locationSectionModel = [[DownloadModel alloc] init];
+    locationSectionModel.sectionType = DownloadSectionTypeLocation;
+    _isExistLocationSection = YES;
+    [self.sectionDataArray addObject:locationSectionModel];
+    
 }
 
 #pragma mark - TableViewCell数据的增减，更新
-// 新增下载模型任务
-- (void)addTaskWithModel:(DownloadCellModel *)model{
+- (BOOL)addTaskWithVideoModel:(VideoModel *)model{
     
-    if([[ZHDownloadTaskManager shareTaskManager] didExistTask:model.name]){
-        return;
+    if([[ZHDownloadTaskManager shareTaskManager] didExistTask:model.name] || model.path){
+        return NO;
     }
-
-     @synchronized(self){
-         
-        // 新增任务，先确定正在下载的section存在，如不在就创建
-        if (!_isExistDownloadSection) {
-            NSLog(@"需要创建正在下载section");
-            DownloadModel *sectionModel = [[DownloadModel alloc] init];
-            sectionModel.sectionType = DownloadSectionTypeDownload;
-            _isExistDownloadSection = YES;
-            [self.sectionDataArray insertObject:sectionModel atIndex:0];
-            [self.downlaodTableView insertSections:[NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0, 1)] withRowAnimation:UITableViewRowAnimationNone];
-        }
+    
+    @synchronized(self){
         
-         DownloadModel *downloadSectionModel = self.sectionDataArray.firstObject;
-         [downloadSectionModel.cellModelsArray addObject:model];
-         [[ZHDownloadTaskManager shareTaskManager] addDownloadTask:model.downloadPath toFileName:model.name];
-         [self.downlaodTableView reloadSections:[NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0, 1)] withRowAnimation:UITableViewRowAnimationNone];
+        // 新增任务，先确定正在下载的section存在，如不在就创建
+        [self shouldCreateDownloadSection];
+        
+        DownloadModel *downloadSectionModel = self.sectionDataArray.firstObject;
+        [downloadSectionModel.cellModelsArray addObject:model];
+        [[ZHDownloadTaskManager shareTaskManager] addDownloadTask:model.downloadPath toFileName:model.name];
+        model.index = downloadSectionModel.cellModelsArray.count;
+        BOOL isInsertSuccess = [[DBManager shareTaskManager] insertData:model atIndex:(downloadSectionModel.cellModelsArray.count)];
+        [self.downlaodTableView reloadSections:[NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0, 1)] withRowAnimation:UITableViewRowAnimationNone];
+        NSLog(@"%@",isInsertSuccess ? @"插入成功" : @"插入失败");
     }
-
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(complement:) name:@"complement" object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(response:) name:@"response" object:nil];
+    
+    return YES;
 }
 
 // 更新下载进度，状态
@@ -204,12 +222,13 @@ NSUInteger a;
     
     for (int i = 0; i < downloadSectionModel.cellModelsArray.count; i++) {
         
-        DownloadCellModel *model = downloadSectionModel.cellModelsArray[i];
+        VideoModel *model = downloadSectionModel.cellModelsArray[i];
         if (model.isDownloading == NO) {
             continue;
         }
         long long tempDataSize = [[ZHDownloadTaskManager shareTaskManager] getDownloadDataSizeWithName:model.name];
         model.tempDataSize = tempDataSize;
+        [[DBManager shareTaskManager]updateData:model];
         dispatch_async(dispatch_get_main_queue(), ^{
             [_downlaodTableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:i inSection:0]] withRowAnimation:UITableViewRowAnimationNone];
         });
@@ -219,13 +238,17 @@ NSUInteger a;
 
 #pragma mark - NSNotificationCenter通知(分别为下载开始，成功，失败）
 - (void)viewWillAppear:(BOOL)animated{
+    
     [super viewWillAppear:animated];
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(complement:) name:@"complement" object:nil];
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(response:) name:@"response" object:nil];
+    if (self.sectionDataArray.count != 0) {
+        [self.currentTimer setFireDate:[NSDate distantPast]];
+    }
 }
 
 - (void)viewWillDisappear:(BOOL)animated{
+    
     [super viewWillDisappear:animated];
+    [self.currentTimer setFireDate:[NSDate distantFuture]];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
@@ -250,7 +273,7 @@ NSUInteger a;
     NSDictionary *dict = notification.userInfo;
     
     DownloadModel *downloadSectionModel = self.sectionDataArray.firstObject;
-    DownloadCellModel *model = downloadSectionModel.cellModelsArray[[notification.object integerValue]];
+    VideoModel *model = downloadSectionModel.cellModelsArray[[notification.object integerValue]];
     if(!model && !notification.userInfo[@"size"]){
         return;
     }
@@ -261,12 +284,13 @@ NSUInteger a;
     
 }
 
+
 #pragma mark - 完成后更新 , 考虑是否需要加锁
 - (void)updateArrayInfoWithName:(NSString *)indexString andInfo:(NSDictionary *)info{
 
     //取出模型
     DownloadModel *downloadSectionModel = self.sectionDataArray.firstObject;
-    DownloadCellModel *model = downloadSectionModel.cellModelsArray[[indexString integerValue]];
+    VideoModel *model = downloadSectionModel.cellModelsArray[[indexString integerValue]];
     NSString *errorStirng = [info objectForKey:@"error"];
     if (!model) {
         NSLog(@"模型不存在");
@@ -280,9 +304,9 @@ NSUInteger a;
     }else{
         
         model.tempDataSize = model.totalSize;
-        model.isDownloading = NO;
+        [model setIsDownloading:NO];
         model.path = [info objectForKey:@"path"];
-        
+        model.progressInfo = @"100%";
         //获取系统当前时间
         NSDate *currentDate = [NSDate date];
         //用于格式化NSDate对象
@@ -292,14 +316,9 @@ NSUInteger a;
         //NSDate转NSString
         model.dateString = [dateFormatter stringFromDate:currentDate];
         
-        if (!_isExistLocationSection) {
-            
-            //创建本地section
-            DownloadModel *locationSectionModel = [[DownloadModel alloc] init];
-            locationSectionModel.sectionType = DownloadSectionTypeLocation;
-            _isExistLocationSection = YES;
-            [self.sectionDataArray addObject:locationSectionModel];
-        }
+        [[DBManager shareTaskManager] updateData:model];
+        
+        [self shouldCreateLocationSection];
         
         DownloadModel *locationSectionModel = self.sectionDataArray.lastObject;
         [locationSectionModel.cellModelsArray addObject:model];
@@ -313,6 +332,11 @@ NSUInteger a;
         }
     }
 
+    //NSArray *arr =  [[DBManager shareTaskManager] queryData];
+    //NSLog(@"===%@",arr);
+    //请完成程序启动就搜索数据库，还原数据到控制器（副线程，控制器是单例）
+    
+    
     if (![[ZHDownloadTaskManager shareTaskManager] didDownloadingTask] && self.currentTimer.isValid == YES) {
         // 停止更新
         [self.currentTimer setFireDate:[NSDate distantFuture]];
@@ -321,18 +345,6 @@ NSUInteger a;
     dispatch_async(dispatch_get_main_queue(), ^{
         [_downlaodTableView reloadData];
     });
-    
-    // 两个section需要更新
-//    dispatch_async(dispatch_get_main_queue(), ^{
-//        [_downlaodTableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:[self.dataArray indexOfObject:model] inSection:0]] withRowAnimation:UITableViewRowAnimationNone];
-//    });
-    
-    // 把cell从下载section移动到完成section
-    //    NSIndexPath *oldIndexPath = [NSIndexPath indexPathForRow:[self.dataArray indexOfObject:model] inSection:0];
-    //    [self.downlaodTableView deleteRowsAtIndexPaths:@[oldIndexPath] withRowAnimation:UITableViewRowAnimationNone];
-    //    [self.downlaodTableView insertRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:self.localDataArray.count inSection:1]] withRowAnimation:UITableViewRowAnimationNone];
-    
-    //[self.downlaodTableView moveRowAtIndexPath:oldIndexPath toIndexPath:[NSIndexPath indexPathForRow:self.localDataArray.count inSection:1]];
 }
 
 
@@ -342,7 +354,7 @@ NSUInteger a;
     
     // 删除模型
     DownloadModel *sectionModel = [self.sectionDataArray objectAtIndex:indexPath.section];
-    DownloadCellModel *cellModel = sectionModel.cellModelsArray[indexPath.row];
+    VideoModel *cellModel = sectionModel.cellModelsArray[indexPath.row];
     if ([sectionModel didEmptyAfterRemoveObjectInCellModelsArrayIndex:indexPath.row]) {
         [self.sectionDataArray removeObjectAtIndex:0];
         _isExistDownloadSection = NO;
@@ -400,7 +412,7 @@ NSUInteger a;
     NSLog(@"cellForRowAtIndexPath 方法 :%lu 组，%lu行",indexPath.section,indexPath.row);
     
     // 取出组内模型
-    DownloadCellModel *cellModel = model.cellModelsArray[indexPath.row];
+    VideoModel *cellModel = model.cellModelsArray[indexPath.row];
     
     if (model.sectionType == DownloadSectionTypeLocation) {
         
@@ -415,6 +427,20 @@ NSUInteger a;
         cell.delegate = self;
         cell.tableview = tableView;
         return cell;
+    }
+}
+
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath{
+    
+    // 找到对应的section组, 取出模型
+    DownloadModel *model = self.sectionDataArray[indexPath.section];
+    VideoModel *cellModel = model.cellModelsArray[indexPath.row];
+    
+    if ([[NSFileManager defaultManager] fileExistsAtPath:cellModel.path]) {
+        
+        PlayerVC *player = [[PlayerVC alloc]initWithVideoName:[NSURL URLWithString:cellModel.path]];
+        [self.navigationController pushViewController:player animated:YES];
     }
 }
 
@@ -441,7 +467,7 @@ NSUInteger a;
 - (void)cellChangeStateAtIndexPath:(NSIndexPath *)indexp{
     
     DownloadModel *model = self.sectionDataArray[indexp.section];
-    DownloadCellModel *cellModel = model.cellModelsArray[indexp.row];
+    VideoModel *cellModel = model.cellModelsArray[indexp.row];
     
     if(cellModel.isDownloading){
         
@@ -490,7 +516,7 @@ NSUInteger a;
 - (void)removeButtonClickActionAtIndexPath:(NSIndexPath *)indexp{
 
     DownloadModel *model = self.sectionDataArray[indexp.section];
-    DownloadCellModel *cellModel = model.cellModelsArray[indexp.row];
+    VideoModel *cellModel = model.cellModelsArray[indexp.row];
     if ([model didEmptyAfterRemoveObjectInCellModelsArray:cellModel]) {
         
         if (_isExistDownloadSection && _isExistLocationSection) {
