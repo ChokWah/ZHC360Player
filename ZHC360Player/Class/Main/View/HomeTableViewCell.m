@@ -2,17 +2,20 @@
 //  HomeTableViewCell.m
 //  ZHC360Player
 //
-//  Created by 4DAGE_HUA on 16/10/8.
+//  Created by 4DAGE_HUA on 16/4/28.
 //  Copyright © 2016年 4DAGE. All rights reserved.
 //
 
 #import "HomeTableViewCell.h"
 #import "VideoModel.h"
-#import "DownloadViewController.h"
+#import "UIImageView+WebCache.h"
+#import "ZHProgressView.h"
 
 @interface HomeTableViewCell ()
 
-@property (strong, nonatomic)VideoModel *videoModel;
+@property (assign, nonatomic)NSUInteger index;
+
+@property (strong, nonatomic)ZHProgressView *progressView;
 
 @end
 
@@ -21,104 +24,64 @@
 + (instancetype)cellWithTableView:(UITableView *)tableView withVideoModel:(VideoModel *)model{
     
     static NSString *cellID = @"onlineCell";
-    
     HomeTableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellID];
     
     if (!cell) {
         cell = [[[NSBundle mainBundle] loadNibNamed:NSStringFromClass([HomeTableViewCell class]) owner:nil options:nil] lastObject];
+        [cell setWidth:ZHAppWidth];
+        [cell.progressView setHidden:YES];
+        cell.progressView = [[ZHProgressView alloc] initWithFrame:CGRectMake(0, 0, 150, 50)];
+        [cell.contentView addSubview:cell.progressView];
     }
     
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
-    cell.layer.masksToBounds = YES;
+    cell.backgroundColor = [UIColor clearColor];
+    //cell.layer.masksToBounds = YES;
+    //cell.backGoundImageView.layer.masksToBounds = YES;
+    
     //这里设置内容 , 调用cell的属性设置
-    cell.testLabel.text = model.name;
-    cell.videoModel = model;
+    cell.nameLabel.text = model.name;
+    cell.index = model.index;
+    [cell.backGoundImageView lhy_loadImageUrlStr:model.imageUrlStr radius:10];
     
-#warning 这里需要学习SDWebImage 缓存图片刷新
-    //[cell.backGoundImageView setImage:[UIImage imageWithContentsOfFile:model.imageUrlStr]];
-    
-    // 圆角
-    // Begin a new image that will be the new image with the rounded corners
-    // (here with the size of an UIImageView)
-    UIGraphicsBeginImageContextWithOptions(cell.backGoundImageView.bounds.size, NO, 1.0);
-    
-    // Add a clip before drawing anything, in the shape of an rounded rect
-    [[UIBezierPath bezierPathWithRoundedRect:cell.backGoundImageView.bounds
-                                cornerRadius:13.0] addClip];
-    // Draw your image
-    [cell.backGoundImageView.image drawInRect:cell.backGoundImageView.bounds];
-    
-    // Get the image, here setting the UIImageView image
-    cell.backGoundImageView.image = UIGraphicsGetImageFromCurrentImageContext();
-    
-    // Lets forget about that we were drawing
-    UIGraphicsEndImageContext();
+    if (model.tempDataSize != 0) {
+        
+        [cell.progressView setHidden:NO];
+        [cell.progressView setProgress:(CGFloat)((CGFloat)model.tempDataSize / (CGFloat)model.totalSize)];
+        (model.tempDataSize == model.totalSize) ? [cell.progressView setHidden:YES] : nil;
+        
+    }
     
     return cell;
 }
 
-- (void)awakeFromNib{
+- (void)updateProgress:(CGFloat)progress{
     
-    [super awakeFromNib];
-    
-    //设置内容和圆角
-    self.backGoundImageView.layer.masksToBounds = YES;
-    self.backgroundColor = [UIColor lightGrayColor];
+    [self.progressView setProgress:progress];
 }
 
-- (IBAction)showMoreOperations:(id)sender {
+- (void)setFrame:(CGRect)frame{
     
-    // 获取当前的行数，提供给代理方法修改cell的高度
-    NSIndexPath *indexp = [[self tableview] indexPathForCell:self];
-    if ([self.delegate respondsToSelector:@selector(cellDetailButtonClickAtIndexPath:)]) {
-        [self.delegate cellDetailButtonClickAtIndexPath:indexp];
-    }
+    __weak typeof(self) weakSelf = self;
+    [self.progressView mas_makeConstraints:^(MASConstraintMaker *make) {
+        
+        make.size.mas_equalTo(CGSizeMake(60, 60));
+        make.right.equalTo(weakSelf.mas_right).offset(-25);
+        make.centerY.mas_equalTo(weakSelf.mas_centerY);
+    }];
+    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc]initWithTarget:self action:@selector(stopAction:)];
+    [self.progressView addGestureRecognizer:tap];
+    [super setFrame:frame];
+}
+
+- (void)stopAction:(id)sender{
     
-    // 对按钮的方向进行旋转
-    if (_isExpand) {
-        
-        [UIView animateWithDuration:0.5 animations:^{
-            _moreOperationsButton.transform = CGAffineTransformMakeRotation(0);
-        } completion:^(BOOL finished) {
-            _isExpand = NO;
-        }];
-        
-    }else{
-        
-        [UIView animateWithDuration:0.5 animations:^{
-            _moreOperationsButton.transform = CGAffineTransformMakeRotation(M_PI);
-        } completion:^(BOOL finished) {
-            _isExpand = YES;
-        }];
+    [self.progressView setHidden:YES];
+    if ([self.delegate respondsToSelector:@selector(stopDownloadAction:)]) {
+        [self.delegate stopDownloadAction:self.index];
     }
 }
 
-// 下载当前cell的视频
-- (IBAction)downloadVideoAction:(id)sender {
-    
-    if ([self.delegate respondsToSelector:@selector(downloadActionWithModel:)]) {
-        [self.delegate downloadActionWithModel:self.videoModel];
-    }
-}
 
-- (void)resetButtonIcon{
-    
-    // 对按钮的方向进行旋转
-    if (_isExpand) {
-        
-        [UIView animateWithDuration:0.5 animations:^{
-            _moreOperationsButton.transform = CGAffineTransformMakeRotation(0);
-        } completion:^(BOOL finished) {
-            _isExpand = NO;
-        }];
-        
-    }else{
-        
-        [UIView animateWithDuration:0.5 animations:^{
-            _moreOperationsButton.transform = CGAffineTransformMakeRotation(M_PI);
-        } completion:^(BOOL finished) {
-            _isExpand = YES;
-        }];
-    }
-}
+
 @end
