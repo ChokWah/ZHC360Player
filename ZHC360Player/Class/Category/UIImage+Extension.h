@@ -12,4 +12,6 @@
 
 + (UIImage *)imageWithColor:(UIColor *)color;
 
+- (UIImage *)drawRectWithRoundedCorner:(CGFloat)radius size:(CGSize)sizeToFit;
+
 @end
