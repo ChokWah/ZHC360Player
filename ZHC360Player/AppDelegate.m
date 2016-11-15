@@ -9,6 +9,8 @@
 #import "AppDelegate.h"
 #import "MainViewController.h"
 #import "DBManager.h"
+#import "AFNetworking.h"
+#import "MBProgressHUD+MJ.h"
 
 @interface AppDelegate ()
 
@@ -37,13 +39,13 @@
         
         [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"firstStart"];
         
-        NSLog(@"第一次启动");
+        dispatch_async(dispatch_get_global_queue(0, 0), ^{
+            
+            [ZHDBMANAGER openOrCreateTableWithName:TABLENAME] ? NSLog(@"数据库存在") : NSLog(@"数据库不存在");
+            //[ZHDBMANAGER closeDatabase];
+            
+        });
     }
-    
-    dispatch_async(dispatch_get_global_queue(0, 0), ^{
-        
-        [[DBManager shareTaskManager] createDatabase] ? NSLog(@"数据库存在") : NSLog(@"数据库不存在");
-    });
     return YES;
 }
 
