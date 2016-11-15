@@ -22,15 +22,9 @@
 //    [cellModel setValuesForKeysWithDictionary:dict];
     
     VideoModel *cellModel = [VideoModel objectWithKeyValues:dict];
-
-    
     return cellModel;
 }
 
-//- (id)valueForUndefinedKey:(NSString *)key{
-//    
-//    return nil;
-//}
 
 - (NSString *)progressInfo{
     

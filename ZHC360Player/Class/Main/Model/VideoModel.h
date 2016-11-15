@@ -38,7 +38,7 @@
 @property (nonatomic, assign) BOOL isDownloading;
 
 /** 是否处于查看操作状态*/
-@property (nonatomic, assign) BOOL isEditing;
+@property (nonatomic, assign) BOOL isReadyDownload;
 
 /** 顺序index*/
 @property (nonatomic, assign) NSUInteger index;
