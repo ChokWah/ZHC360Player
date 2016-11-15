@@ -8,7 +8,7 @@
 		<key>name</key>
 		<string>plane.mp4</string>
 		<key>imageUrlStr</key>
-		<string>http://7xl99o.com2.z0.glb.qiniucdn.com/testDownload.jpg</string>
+		<string>http://7xl99o.com2.z0.glb.qiniucdn.com/plane.jpeg</string>
 	</dict>
 	<dict>
 		<key>downloadPath</key>
@@ -16,23 +16,31 @@
 		<key>name</key>
 		<string>HELP.mp4</string>
 		<key>imageUrlStr</key>
-		<string>http://7xl99o.com2.z0.glb.qiniucdn.com/HELP.png</string>
+		<string>http://7xl99o.com2.z0.glb.qiniucdn.com/HELP.jpeg</string>
 	</dict>
 	<dict>
 		<key>downloadPath</key>
-		<string>https://dn-4dage.qbox.me/YinLong_AR.apk</string>
+		<string>http://7xl99o.com2.z0.glb.qiniucdn.com/Underwater.mp4</string>
 		<key>name</key>
-		<string>YinLong_AR.apk</string>
+		<string>Underwater.mp4</string>
 		<key>imageUrlStr</key>
-		<string>http://7xl99o.com2.z0.glb.qiniucdn.com/testDownload.jpg</string>
+		<string>http://7xl99o.com2.z0.glb.qiniucdn.com/Underwater.jpeg</string>
 	</dict>
 	<dict>
 		<key>downloadPath</key>
-		<string>https://dn-4dage.qbox.me/bigScene.ipa</string>
+		<string>http://7xl99o.com2.z0.glb.qiniucdn.com/plane2k.mp4</string>
 		<key>name</key>
-		<string>bigScene.ipa</string>
+		<string>plane2k.mp4</string>
 		<key>imageUrlStr</key>
-		<string>http://7xl99o.com2.z0.glb.qiniucdn.com/testDownload.jpg</string>
+		<string>http://7xl99o.com2.z0.glb.qiniucdn.com/plane2k.jpeg</string>
+	</dict>
+	<dict>
+		<key>downloadPath</key>
+		<string>http://7xl99o.com2.z0.glb.qiniucdn.com/gopro2k.mp4</string>
+		<key>name</key>
+		<string>gopro2k.mp4</string>
+		<key>imageUrlStr</key>
+		<string>http://7xl99o.com2.z0.glb.qiniucdn.com/gopro2k.jpeg</string>
 	</dict>
 </array>
 </plist>

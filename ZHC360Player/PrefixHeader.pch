@@ -27,17 +27,21 @@
 #import "UITableView+tableViewType.h"
 #import "NSObject+Property.h"
 #import "NSObject+keyValue2object.h"
+#import "DBManager.h"
+#import "ZHDownloadTaskManager.h"
+#import "UIImageView+fillet.h"
 
-#define ZHfileManager [NSFileManager defaultManager]
-#define coredataManager [ZHCoreDataManager sharedManager]
+#define ZHFILEMANAGER [NSFileManager defaultManager]
+#define ZHDBMANAGER [DBManager shareDBManager]
+#define ZHDWMANAGER [ZHDownloadTaskManager shareTaskManager]
 
-#define theBundle [NSBundle mainBundle]
+#define ZHNSBundle [NSBundle mainBundle]
 #define VIDEOTABLECELL_NAME   @"Video"
 
+#define TABLENAME @"downloadTable"
 
-#define ONLINEPLIST @"http://show.4dage.com/testDownload.plist"
 
-
+#define PlistLink @"http://show.4dage.com/testDownload.plist"
 
 //全局的绿色主题
 #define ZHColor(r, g, b) [UIColor colorWithRed:r/255.0f green:g/255.0f blue:b/255.0f alpha:1]
@@ -50,7 +54,14 @@
 #define ZHcachePath [NSSearchPathForDirectoriesInDomains(NSCachesDirectory,NSUserDomainMask,YES)lastObject]
 
 
-//#define plistPath [[NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,NSUserDomainMask,YES)lastObject] stringByAppendingPathComponent:@"mp4File.plist"]
+// 根据名字获取缓冲文件长度
+#define ZHGETCacheFileLength(name) [[ZHFILEMANAGER attributesOfItemAtPath:[ZHcachePath stringByAppendingPathComponent:name] error:nil][NSFileSize] integerValue]
+
+// 根据名字获取缓冲文件路径
+#define ZHCacheFilePath(name) [ZHcachePath stringByAppendingPathComponent:name]
+
+// 根据名字获取保存文件路径
+#define ZHDocumentFilePath(name) [ZHdocumentPath stringByAppendingPathComponent:name]
 
 
 //抽屉顶部距离 底部一样
