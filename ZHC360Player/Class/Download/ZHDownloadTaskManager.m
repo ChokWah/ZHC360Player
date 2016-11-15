@@ -9,26 +9,30 @@
 #import "ZHDownloadTaskManager.h"
 #import "ZHDownload.h"
 #import "NSString+Hash.h"
+#import "VideoModel.h"
 
-// 已下载长度(直接读取)
-#define ZHGETCacheFileLength(name) [[[NSFileManager defaultManager] attributesOfItemAtPath:[[NSSearchPathForDirectoriesInDomains(NSCachesDirectory,NSUserDomainMask,YES)lastObject] stringByAppendingPathComponent:name] error:nil][NSFileSize] integerValue]
-
-// 保存每个任务的总大小（以名字为key）迁移到sqlite3里面
-#define ZHDownloadFileLengthDictionaryPath [[NSSearchPathForDirectoriesInDomains(NSCachesDirectory,NSUserDomainMask,YES)lastObject] stringByAppendingPathComponent:@"ZHDownloadFileLengthDictionaryPath.plist"]
-
-// 缓存文件夹
-#define ZHCacheFilePath(name) [[NSSearchPathForDirectoriesInDomains(NSCachesDirectory,NSUserDomainMask,YES)lastObject] stringByAppendingPathComponent:name]
-
-// 根据名字获取沙盒文档的文件
-#define ZHDocumentFilePath(name) [[NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,NSUserDomainMask,YES)lastObject] stringByAppendingPathComponent:name]
 
 // 最大下载数
 #define MAXTasks 2
 
+@interface ZHDownloadTaskManager()<ZHDownloadDelegate>
+
+//====================属性====================
+
+/** 正在下载列表 */
+@property (nonatomic, strong) NSMutableArray <ZHDownload *> *tasksArray;
+
+// name : downloadIndex | 从1开始
+@property (nonatomic, strong) NSMutableDictionary *downloadIndexDict;
+
+
+@end
+
 @implementation ZHDownloadTaskManager
 
-#pragma mark - 单例
 static ZHDownloadTaskManager *singletonManager;
+
+#pragma mark - 单例,懒加载
 + (instancetype)shareTaskManager{
     
     static dispatch_once_t onceToken;
@@ -53,15 +57,6 @@ static ZHDownloadTaskManager *singletonManager;
     return singletonManager;
 }
 
-#pragma mark - 懒加载
-- (NSMutableDictionary *)tasksDictionary{
-    
-    if (!_tasksDictionary) {
-        _tasksDictionary = [NSMutableDictionary dictionary];
-    }
-    return _tasksDictionary;
-}
-
 - (NSMutableArray *)tasksArray{
     
     if (!_tasksArray) {
@@ -70,48 +65,49 @@ static ZHDownloadTaskManager *singletonManager;
     return _tasksArray;
 }
 
-/** 判断本地是否有，木有再新建一个 */
-- (NSMutableDictionary *)fileTotalSizeDictionary{
-    
-    if (!_fileTotalSizeDictionary) {
-        
-        _fileTotalSizeDictionary = [NSMutableDictionary dictionaryWithContentsOfFile:ZHDownloadFileLengthDictionaryPath];
-        
-        !_fileTotalSizeDictionary ? _fileTotalSizeDictionary = [NSMutableDictionary dictionary] : nil;
-    }
-    return _fileTotalSizeDictionary;
-}
-
-// 新增下载任务
-- (void)addDownloadTask:(NSString *)urlString toFileName:(NSString *)fileName{
+- (void)taskArrayKVO{
     
     // 第一次创建新的下载任务的时候，开启观察者（仅一次）
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         [self addObserver:self forKeyPath:@"tasksArray" options:NSKeyValueObservingOptionNew context:@"tasksArray"];
     });
-    
-    // 数据持久化检查
-    if([self.fileTotalSizeDictionary.allKeys containsObject:fileName] && [[NSFileManager defaultManager] fileExistsAtPath:ZHDocumentFilePath(fileName)]){
-        
-        NSLog(@"已完成下载，本地已经存在");
-        return;
-    }
-#warning 曾经下载过，没完成，当前任务列表也没有, 干脆直接重新下载算了
+}
 
+- (BOOL)isTaskDownloading{
     
-    // 新建任务添加到下载列表
-    ZHDownload *task = [[ZHDownload alloc] initWithName:fileName andURLString:urlString];
-    if(self.fileTotalSizeDictionary[fileName]){
-        task.totalSize = [self.fileTotalSizeDictionary[fileName] unsignedIntegerValue];
+    return self.tasksArray.count;
+}
+
+- (NSMutableDictionary *)downloadIndexDict{
+    
+    if (!_downloadIndexDict) {
+        _downloadIndexDict = [NSMutableDictionary dictionary];
     }
+    return _downloadIndexDict;
+}
+
+#pragma mark - 增加下载任务
+- (BOOL)addDownloadTaskWithModel:(VideoModel *)model{
+    
+    [self taskArrayKVO];
     
     @synchronized(self){
         
-        [self.tasksDictionary setObject:task forKey:fileName.md5String];
-        [self.tasksArray count] < MAXTasks ? [[self mutableArrayValueForKey:@"tasksArray"] addObject:task] : (task.taskState = ZHDownloadStateReadyDownload) ;
-        task.index = [self.tasksArray indexOfObject:task];
+        if ([ZHFILEMANAGER fileExistsAtPath:ZHCacheFilePath(model.name)]) {
+            [ZHFILEMANAGER removeItemAtPath:ZHCacheFilePath(model.name) error:nil];
+        }
+        if (self.tasksArray.count >=  MAXTasks) {
+            return NO;
+        }
+        
+        ZHDownload *download = [[ZHDownload alloc] initWithName:model.name andURLString:model.downloadPath];
+        download.index = model.index;
+        [[self mutableArrayValueForKey:@"tasksArray"] addObject:download];
+        [self.downloadIndexDict setObject:@(self.tasksArray.count) forKey:download.name];
+        download.delegate = self;
     }
+    return YES;
 }
 
 #pragma mark - 观察者方法
@@ -121,19 +117,15 @@ static ZHDownloadTaskManager *singletonManager;
         
         ZHDownload *task = (ZHDownload *)[[change objectForKey:@"new"] firstObject];
         
-        if (task) { /** 下载队列增加下载任务的时候 */
+        if (task) { // 下载队列增加下载任务的时候
             
+            task.index = [self.tasksArray indexOfObject:task];
             [self startDownloadTaskModel:task];
+            task.taskState = ZHDownloadStateDownloading;
             
-        }else{      /** 下载队列减少任务的时候，从字典取出待下载任务加进来 */
-
-            [self.tasksDictionary enumerateKeysAndObjectsWithOptions:NSEnumerationConcurrent usingBlock:^(id  _Nonnull key, ZHDownload  *_Nonnull obj, BOOL * _Nonnull stop) {
-                
-                if (obj.taskState == ZHDownloadStateReadyDownload) {
-                    [self startDownloadTaskModel:obj];
-                    *stop = YES;
-                }
-            }];
+        }else{      // 下载队列减少任务的时候，取出未下载，或者被停止的任务
+ 
+            MAXTasks > self.tasksArray.count ? [[NSNotificationCenter defaultCenter] postNotificationName:@"readyDownload" object:[NSNumber numberWithUnsignedInteger:MAXTasks - self.tasksArray.count] userInfo:nil] : nil;
         }
         
     }else{ // 防止crash
@@ -142,44 +134,55 @@ static ZHDownloadTaskManager *singletonManager;
 }
 
 // 回调更新进度
-- (long long )getDownloadDataSizeWithName:(NSString *)name{
+- (long long)getDownloadDataSizeWithName:(NSString *)name{
     
-    ZHDownload *task = [self.tasksDictionary objectForKey:name.md5String];
-    return (task.tempDataSize/1024);
+    //NSUInteger tempSize =  ZHGETCacheFileLength(name);
+    
+    ZHDownload *dw = [self getDownloadModelWith:name];
+    return (dw.tempDataSize / 1024);
 }
 
-
-#pragma mark - 提供给控制器查询
-// 查询是否存在任务
-- (BOOL)didExistTask:(NSString *)name{
+// 根据名字取出任务模型
+- (ZHDownload *)getDownloadModelWith:(NSString *)name{
     
-    if (self.tasksDictionary[name.md5String]) {
-        return YES;
-    }else{
-        return NO;
+    if(![self.downloadIndexDict.allKeys containsObject:name]){
+        return nil;
     }
-}
-
-// 是否在下载中，需要更新
-- (BOOL)didDownloadingTask{
-    
-    // 遍历数组，查看是否在下载
-    for (ZHDownload *downloadTask in self.tasksArray) {
+    @synchronized (self) {
         
-        if(downloadTask.taskState == ZHDownloadStateDownloading){
-            return YES;
+        NSUInteger index = [[self.downloadIndexDict objectForKey:name] unsignedIntegerValue];
+        if(self.tasksArray.count >= index){
+            
+            ZHDownload *dw = [self.tasksArray objectAtIndex:index-1];
+            return dw;
         }
     }
-    return NO;
+    return nil;
+}
+#pragma mark - ZHDownload代理方法
+- (void)ZHDownload:(ZHDownload *)task didCompleteWithInfo:(NSDictionary *)infoDict Error:(NSError *)error{
+ 
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"complement" object:error userInfo:infoDict];
+    
+    if (error) {
+        [ZHFILEMANAGER removeItemAtPath:ZHCacheFilePath(infoDict[@"name"]) error:nil];
+    }
+    
+    [[self mutableArrayValueForKey:@"tasksArray"] removeObject:task];
+    [self.downloadIndexDict.allKeys containsObject:task.name] ? [self.downloadIndexDict removeObjectForKey:task.name] : nil;
+}
+
+- (void)ZHDownload:(ZHDownload *)task didReceiveResponseWithInfo:(NSDictionary *)infoDict{
+    
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"response" object:nil userInfo:infoDict];
 }
 
 #pragma mark - 对任务操作，新建，删除，停止，恢复
-// 新增下载任务
+// 开始下载
 - (void)startDownloadTaskModel:(ZHDownload *)task{
     
     dispatch_async(dispatch_get_global_queue(0, 0), ^{
         //__weak typeof(self) weakSelf = self;
-        task.taskState = ZHDownloadStateDownloading;
         [task downloadTask];
     });
 }
@@ -187,58 +190,34 @@ static ZHDownloadTaskManager *singletonManager;
 // 完成下载，删除任务
 - (void)completeWithTaskName:(NSString *)name{
     
-    @synchronized(self){
+    [self deleteTaskName:name];
+}
+
+// 根据名字移除任务
+- (BOOL)removeDownloadTaskName:(NSString *)name{
+    
+    BOOL isSuccess = [self deleteTaskName:name];
+    if (isSuccess) {
+        [ZHFILEMANAGER removeItemAtPath:ZHCacheFilePath(name) error:nil];
+    }
+    return isSuccess;
+}
+
+- (BOOL)deleteTaskName:(NSString *)name{
         
-        ZHDownload *task = [self.tasksDictionary objectForKey:name.md5String];
-        [[self mutableArrayValueForKey:@"tasksArray"] removeObject:task];
-        [self.tasksDictionary removeObjectForKey:name.md5String];
+    if (self.tasksArray.count == 0) {
+        return NO;
     }
-}
-
-//删除下载任务
-- (void)removeDownloadTaskName:(NSString *)name{
     
-    ZHDownload *tempTask = self.tasksDictionary[name.md5String];
-    tempTask ? [tempTask cancelTask] : NSLog(@"No this Task");
+    ZHDownload *dw = [self getDownloadModelWith:name];
     
-    [self.tasksDictionary removeObjectForKey:name];
-}
-
-//暂停下载任务
-- (void)suspendDownloadTaskName:(NSString *)name{
-    
-    ZHDownload *tempTask = self.tasksDictionary[name.md5String];
-    if(tempTask && tempTask.taskState == ZHDownloadStateDownloading) {
+    if (dw) {
         
-        [tempTask suspendTask];
-        tempTask.taskState = ZHDownloadStateSuspended;
-        [self.tasksDictionary removeObjectForKey:name];
+        [dw cancelTask];
+        NSLog(@"移除缓存成功");
+        return YES;
     }
-}
-
-//恢复下载任务
-- (void)resumeDownloadTaskName:(NSString *)name{
-    
-    ZHDownload *tempTask = self.tasksDictionary[name.md5String];
-    if(tempTask && tempTask.taskState == ZHDownloadStateSuspended) {
-        
-        [tempTask resumeTask];
-        tempTask.taskState = ZHDownloadStateDownloading;
-        [self.tasksDictionary setObject:tempTask forKey:name];
-    }
-}
-
-//保存到本地
-- (void)saveAllLength:(NSUInteger)allLength WithFileName:(NSString *)name{
-    
-    if (allLength == 0 || name == nil) {
-        return;
-    }
-    
-    [self.fileTotalSizeDictionary setObject:@(allLength) forKey:name];
-    if (![self.fileTotalSizeDictionary writeToFile:ZHDownloadFileLengthDictionaryPath atomically:YES]) {
-        NSLog(@"fail to archive dictionary object : %@",self.fileTotalSizeDictionary);
-    }
+    return NO;
 }
 
 - (void)dealloc{
@@ -246,4 +225,5 @@ static ZHDownloadTaskManager *singletonManager;
     //父类方法已经默认调用，不用复写
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
+
 @end

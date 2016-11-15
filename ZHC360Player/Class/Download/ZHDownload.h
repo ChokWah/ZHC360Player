@@ -21,6 +21,15 @@ typedef NS_ENUM(NSInteger, ZHDownloadState) {
     ZHDownloadStateFailed
 };
 
+@protocol ZHDownloadDelegate <NSObject>
+
+- (void)ZHDownload:(ZHDownload *)task didCompleteWithInfo:(NSDictionary *)infoDict Error:(NSError *)error;
+
+- (void)ZHDownload:(ZHDownload *)task didReceiveResponseWithInfo:(NSDictionary *)infoDict;
+
+@end
+
+
 @interface ZHDownload : NSObject<NSURLSessionDataDelegate>
 
 //==============================属性=======================================
@@ -39,8 +48,11 @@ typedef NS_ENUM(NSInteger, ZHDownloadState) {
 /** 任务状态 */
 @property (nonatomic, assign) ZHDownloadState taskState;
 
-@property (assign, nonatomic) NSInteger index;
+@property (nonatomic, weak)   id <ZHDownloadDelegate> delegate;
+
+@property (assign, nonatomic) NSUInteger index;
 //==============================方法=======================================
++ (instancetype)downloadModelWith:(NSDictionary *)dict;
 
 /** 任务初始化 */
 - (instancetype)initWithName:(NSString *)fileName andURLString:(NSString *)urlString;

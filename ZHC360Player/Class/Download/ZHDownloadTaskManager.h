@@ -8,18 +8,8 @@
 
 #import <Foundation/Foundation.h>
 
+@class VideoModel;
 @interface ZHDownloadTaskManager : NSObject
-
-//====================属性====================
-
-/** 正在下载列表 */
-@property (nonatomic, strong) NSMutableArray  *tasksArray;
-
-/** 对应正在下载列表 (以链接的md5的string为key)*/
-@property (nonatomic, strong) NSMutableDictionary *tasksDictionary;
-
-/** 本地化保存所有任务的文件大小（以名字为key）*/ // 迁移到sqlite3里面
-@property (nonatomic, strong) NSMutableDictionary *fileTotalSizeDictionary;
 
 //====================方法====================
 /** 单例，返回管理器的对象 */
@@ -28,28 +18,14 @@
 /** 完成下载，移除某一个任务 */
 - (void)completeWithTaskName:(NSString *)name;
 
-/** 移除某一个任务 */
-- (void)removeDownloadTaskName:(NSString *)name;
+/** 根据名字移除任务 */
+- (BOOL)removeDownloadTaskName:(NSString *)name;
 
-/** 暂停某一个任务 */
-- (void)suspendDownloadTaskName:(NSString *)name;
+/** 是否还有下载任务 */
+- (BOOL)isTaskDownloading;
 
-/** 恢复某一个任务 */
-- (void)resumeDownloadTaskName:(NSString *)name;
+- (BOOL)addDownloadTaskWithModel:(VideoModel *)model;
 
-/** 下载方法 */
-- (void)addDownloadTask:(NSString *)urlString toFileName:(NSString *)fileName;
-
-/** 是否存在此任务 */
-- (BOOL)didExistTask:(NSString *)name;
-
-/** 是否存在下载中任务 */
-- (BOOL)didDownloadingTask;
-
-/** 把本地持久化数据恢复到vc跟管理器 */ // 迁移到sqlite3里面
- - (void)saveAllLength:(NSUInteger)allLength WithFileName:(NSString *)name;
-
-// 迁移到sqlite3里面
- - (long long )getDownloadDataSizeWithName:(NSString *)name;
+- (long long)getDownloadDataSizeWithName:(NSString *)name;
 
 @end

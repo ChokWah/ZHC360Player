@@ -11,15 +11,6 @@
 #import "NSString+Hash.h"
 #import "ZHDownloadTaskManager.h"
 
-//已下载长度
-#define ZHGETCacheFileLength(name) [[[NSFileManager defaultManager] attributesOfItemAtPath:[[NSSearchPathForDirectoriesInDomains(NSCachesDirectory,NSUserDomainMask,YES)lastObject] stringByAppendingPathComponent:name] error:nil][NSFileSize] integerValue]
-
-//缓存文件夹
-#define ZHCacheFilePath(name) [[NSSearchPathForDirectoriesInDomains(NSCachesDirectory,NSUserDomainMask,YES)lastObject] stringByAppendingPathComponent:name]
-
-//管理器的单例
-#define ZHDownloadmanager [ZHDownloadTaskManager shareTaskManager]
-
 
 @interface ZHDownload ()
 
@@ -35,6 +26,12 @@
 @end
 
 @implementation ZHDownload
+
++ (instancetype)downloadModelWith:(NSDictionary *)dict{
+    
+    ZHDownload *dwModel = [ZHDownload objectWithKeyValues:dict];
+    return dwModel;
+}
 
 #pragma mark - 懒加载类属性
 - (instancetype)initWithName:(NSString *)fileName andURLString:(NSString *)urlString{
@@ -58,7 +55,6 @@
         // 创建一个Data任务
         _dataTask = [self.session dataTaskWithRequest:mutableRequest];
         NSLog(@"_dataTask 懒加载");
-
     }
     return _dataTask;
 }
@@ -72,21 +68,30 @@
     return _outputSteam;
 }
 
+//- (NSURLSession *)session{
+//    
+//    if (!_session) {
+//        
+//        _session = [NSURLSession sessionWithConfiguration:[NSURLSessionConfiguration defaultSessionConfiguration] delegate:self delegateQueue:[[NSOperationQueue alloc] init]];
+//        
+//    }
+//    return _session;
+//}
+
 - (NSURLSession *)getBackgroundSession:(NSString *)identifier {
 
     NSURLSession *backgroundSession = nil;
     NSURLSessionConfiguration *configuration = [NSURLSessionConfiguration backgroundSessionConfigurationWithIdentifier:[NSString stringWithFormat:@"background-NSURLSession-%@",identifier]];
     configuration.HTTPMaximumConnectionsPerHost = 5;
     configuration.discretionary = YES;
+    configuration.sessionSendsLaunchEvents = YES;
     backgroundSession = [NSURLSession sessionWithConfiguration:configuration delegate:self delegateQueue:nil];
-    
     return backgroundSession;
 }
 
 /** 下载 */
 - (void)downloadTask{
     
-    NSLog(@"新建下载任务");
     self.session = [self getBackgroundSession:self.name];
     [self.dataTask resume];
 }
@@ -97,8 +102,8 @@
     //把数据写进沙盒
     [self.outputSteam write:data.bytes maxLength:data.length];
     
-    self.tempDataSize = ZHGETCacheFileLength(self.name);
-    
+    self.tempDataSize += data.length; //ZHGETCacheFileLength(self.name) / 1024;
+
     //NSLog(@"%@ 的进度：%ld / %ld",self.name, self.tempDataSize, self.totalSize);
 }
 
@@ -107,49 +112,52 @@
     NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
     
     NSUInteger allLength = [httpResponse.allHeaderFields[@"Content-Length"] longLongValue] + ZHGETCacheFileLength(self.name);
-    
-    self.totalSize == 0 ? [ZHDownloadmanager saveAllLength:(allLength/1024) WithFileName:self.name] : nil;
-   
     //开启读写流
     NSOutputStream *outputSteam = [NSOutputStream outputStreamToFileAtPath:ZHCacheFilePath(self.name) append:YES];
     self.outputSteam = outputSteam;
     self.totalSize = (allLength/1024);
     [self.outputSteam open];
     completionHandler(NSURLSessionResponseAllow);
-    [[NSNotificationCenter defaultCenter] postNotificationName:@"response" object:[NSNumber numberWithInteger:self.index] userInfo:@{ @"size" : [NSNumber numberWithUnsignedInteger:self.totalSize]}];
+    NSDictionary *dict = @{@"size" : [NSNumber numberWithUnsignedInteger:self.totalSize],
+                           @"name" : self.name};
+    if([self.delegate respondsToSelector:@selector(ZHDownload:didReceiveResponseWithInfo:)]){
+        
+        [self.delegate ZHDownload:self didReceiveResponseWithInfo:dict];
+    }
 }
 
 - (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task didCompleteWithError:(NSError *)error{
     
     NSString *filePath;
     NSMutableDictionary *completeDict = [NSMutableDictionary dictionary];
+    [completeDict setObject:self.name forKey:@"name"];
     
     if (error) {
         self.taskState = ZHDownloadStateFailed;
         [completeDict setObject:error forKey:@"error"];
-        [[NSNotificationCenter defaultCenter] postNotificationName:@"complement" object:self.name userInfo:completeDict];
         NSLog(@"发生错误 ： %@",error);
         
     }else{
         
         filePath = [[NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,NSUserDomainMask,YES)lastObject] stringByAppendingPathComponent:self.name];
         self.taskState = ZHDownloadStateCompleted;
-        [[NSFileManager defaultManager] moveItemAtPath:ZHCacheFilePath(self.name) toPath:filePath error:nil];
+        [ZHFILEMANAGER moveItemAtPath:ZHCacheFilePath(self.name) toPath:filePath error:nil];
         [completeDict setObject:filePath forKey:@"path"];
-        [completeDict setObject:self.name forKey:@"name"];
-        [completeDict setObject:[NSString stringWithFormat:@"%.2f MB",(CGFloat)self.totalSize/2014/1024] forKey:@"size"];
-        [[NSNotificationCenter defaultCenter] postNotificationName:@"complement" object:[NSNumber numberWithInteger: self.index] userInfo:completeDict];
+        [completeDict setObject:[NSString stringWithFormat:@"%.2f MB",(CGFloat)self.totalSize/1024/1024] forKey:@"size"];
     }
     
+    if([self.delegate respondsToSelector:@selector(ZHDownload:didCompleteWithInfo:Error:)]){
+        
+        [self.delegate ZHDownload:self didCompleteWithInfo:completeDict Error:error];
+    }
     self.dataTask = nil;
     [self.outputSteam close];
     self.outputSteam = nil;
-    
-#warning 这里需要做本地视频截图操作，并添加到显示的控制器里
 }
 
 #pragma mark - 对任务的操作 : 需要记录model的下载状态
 - (void)suspendTask{
+    
     
     //设置任务的各种属性变化
     
@@ -172,5 +180,11 @@
     self.taskState = ZHDownloadStateDownloading;
 }
 
-
+- (void)dealloc{
+    
+    _session     = nil;
+    _outputSteam = nil;
+    _dataTask    = nil;
+    NSLog(@"销毁ZHDownload任务");
+}
 @end
