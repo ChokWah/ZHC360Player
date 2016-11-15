@@ -7,44 +7,29 @@
 //
 
 #import "PanViewController.h"
-#import "DownloadViewController.h"
 
 #define ScleanimateWithDuration 0.3
 
-@interface PanViewController ()
-
-//右边的下载视图控制器
-@property (nonatomic, strong) DownloadViewController *downloadVC;
-
-@end
-
 @implementation PanViewController
 
-- (DownloadViewController *)downloadVC{
-    
-    if (!_downloadVC) {
-        
-        _downloadVC = [DownloadViewController defaultViewController];
-    }
-    return _downloadVC;
-}
+
 
 - (void)viewDidLoad{
     
     [super viewDidLoad];
     
     //添加按钮在导航条上
-    self.navigationItem.rightBarButtonItem  = [UIBarButtonItem itemWithTitle:@"下载" titleColor:[UIColor yellowColor] target:self action:@selector(rightClick)];
+    //self.navigationItem.rightBarButtonItem  = [UIBarButtonItem itemWithTitle:@"下载" titleColor:[UIColor yellowColor] target:self action:@selector(rightClick)];
     
-    self.navigationItem.leftBarButtonItem  = [UIBarButtonItem itemWithTitle:@"设置" titleColor:[UIColor brownColor] target:self action:@selector(leftClick)];
-    
+    //self.navigationItem.leftBarButtonItem  = [UIBarButtonItem itemWithTitle:@"设置" titleColor:[UIColor brownColor] target:self action:@selector(leftClick)];
+    self.navigationItem.title = @"全景视频";
     self.view.backgroundColor = ZHColor(239, 239, 244);
 }
 
 - (void)rightClick{
     
-    [self.navigationItem.rightBarButtonItem hideRedPoint];
-    [self.navigationController pushViewController:self.downloadVC animated:YES];
+//    [self.navigationItem.rightBarButtonItem hideRedPoint];
+//    [self.navigationController pushViewController:self.downloadVC animated:YES];
 }
 
 - (void)leftClick{

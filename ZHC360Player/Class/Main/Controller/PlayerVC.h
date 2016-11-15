@@ -11,4 +11,5 @@
 @interface PlayerVC : UIViewController
 
 - (instancetype)initWithVideoName:(NSURL *)nameStr;
+
 @end
