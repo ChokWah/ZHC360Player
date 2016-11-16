@@ -1,5 +1,5 @@
-# ZHC360Player
-下载360视频观看(GoogleCardboardSDK,HTY360Player)，被半废弃的项目，当课后练习
+# ZHC360Player（被砍掉的半成品）
+下载360视频观看(GoogleCardboardSDK,HTY360Player)，当课后练习
 
 
 #### 学习城觅开源项目的UINavigationController框架，Sqlite做永久保存
